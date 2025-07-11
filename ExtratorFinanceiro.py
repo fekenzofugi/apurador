@@ -46,8 +46,14 @@ class ExtratorFinanceiro:
         style.map("TButton", background=[("active", "#e0e0e0")])
         
         # Configura estilo para o botão de processamento
-        style.configure("Accent.TButton", foreground="white", background="#4CAF50")
-        style.map("Accent.TButton", background=[("active", "#45a049")])
+        style.configure("Green.TButton", 
+                      foreground="black",  # Changed to black font
+                      background="#4CAF50",
+                      font=self.fonte_principal,
+                      padding=6)
+        style.map("Green.TButton",
+                background=[("active", "#45a049")],
+                foreground=[("active", "black")])  # Keep black when active
     
     def carregar_configuracoes(self):
         """Carrega configurações persistentes"""
@@ -119,7 +125,7 @@ class ExtratorFinanceiro:
             btn_frame,
             text="➕ Adicionar PDFs",
             command=self.adicionar_arquivos,
-            style="Accent.TButton"
+            style="Green.TButton"
         ).pack(side=tk.LEFT, padx=5)
         
         ttk.Button(
@@ -177,7 +183,7 @@ class ExtratorFinanceiro:
             frame,
             text="⚡ Processar Selecionados",
             command=self.iniciar_processamento,
-            style="Accent.TButton"
+            style="Green.TButton"
         )
         self.btn_processar.grid(row=2, column=0, columnspan=2, pady=(10,0), sticky="ew")
     
