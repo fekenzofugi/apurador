@@ -12,8 +12,8 @@ PADRAO_VALOR = r"R\$ ?(-?\d{1,3}(?:\.\d{3})*,\d{2})"
 class ExtratorFinanceiro:
     def __init__(self, root):
         self.root = root
-        self.root.title("📊 Extrator Financeiro Premium")
-        self.root.geometry("1000x800")
+        self.root.title("📊 Extrator Financeiro")
+        self.root.geometry("1200x800")  # Increased width to accommodate new column
         
         # Configuração inicial
         self.setup_estilos()
@@ -47,13 +47,13 @@ class ExtratorFinanceiro:
         
         # Configura estilo para o botão de processamento
         style.configure("Green.TButton", 
-                      foreground="black",  # Changed to black font
+                      foreground="black",
                       background="#4CAF50",
                       font=self.fonte_principal,
                       padding=6)
         style.map("Green.TButton",
                 background=[("active", "#45a049")],
-                foreground=[("active", "black")])  # Keep black when active
+                foreground=[("active", "black")])
     
     def carregar_configuracoes(self):
         """Carrega configurações persistentes"""
@@ -134,6 +134,12 @@ class ExtratorFinanceiro:
             command=self.limpar_lista
         ).pack(side=tk.LEFT, padx=5)
         
+        ttk.Button(
+            btn_frame,
+            text="🧹 Limpar Histórico",
+            command=self.limpar_historico
+        ).pack(side=tk.LEFT, padx=5)
+        
         # Configuração de padrão
         ttk.Label(btn_frame, text="Padrão de busca:").pack(side=tk.LEFT, padx=(20,5))
         ttk.Entry(
@@ -195,7 +201,7 @@ class ExtratorFinanceiro:
         # Tabela de resultados
         self.tabela_resultados = ttk.Treeview(
             frame,
-            columns=("data", "arquivo", "valor"),
+            columns=("data", "arquivo", "valor", "ocorrencias"),
             show="headings",
             height=12
         )
@@ -204,12 +210,14 @@ class ExtratorFinanceiro:
         colunas = {
             "data": {"text": "Data/Hora", "width": 120},
             "arquivo": {"text": "Arquivo", "width": 200},
-            "valor": {"text": "Valor (R$)", "width": 100}
+            "valor": {"text": "Valor Total (R$)", "width": 120},
+            "ocorrencias": {"text": "Ocorrências", "width": 100}
         }
         
         for col, config in colunas.items():
             self.tabela_resultados.heading(col, text=config["text"])
-            self.tabela_resultados.column(col, width=config["width"], anchor=tk.CENTER if col == "valor" else tk.W)
+            self.tabela_resultados.column(col, width=config["width"], 
+                                        anchor=tk.CENTER if col in ["valor", "ocorrencias"] else tk.W)
         
         # Scrollbar
         vsb = ttk.Scrollbar(frame, orient="vertical", command=self.tabela_resultados.yview)
@@ -273,6 +281,21 @@ class ExtratorFinanceiro:
             self.atualizar_interface()
             self.status_var.set("Lista de arquivos limpa. Adicione novos arquivos para processar.")
     
+    def limpar_historico(self):
+        """Limpa todo o histórico de processamento"""
+        if not self.historico:
+            messagebox.showinfo("Informação", "O histórico já está vazio.")
+            return
+        
+        if messagebox.askyesno(
+            "Confirmar", 
+            "Tem certeza que deseja apagar todo o histórico?\nEsta ação não pode ser desfeita."
+        ):
+            self.historico = []
+            self.salvar_historico()
+            self.atualizar_interface()
+            self.status_var.set("Histórico apagado com sucesso.")
+    
     def iniciar_processamento(self):
         """Inicia o processamento dos arquivos selecionados"""
         if not self.arquivos_pendentes:
@@ -314,6 +337,7 @@ class ExtratorFinanceiro:
                         "arquivo": os.path.basename(arquivo),
                         "caminho": arquivo,
                         "valor": resultado["total"],
+                        "ocorrencias": resultado["contagem"],
                         "status": "sucesso"
                     }
                     
@@ -325,6 +349,7 @@ class ExtratorFinanceiro:
                         "arquivo": os.path.basename(arquivo),
                         "caminho": arquivo,
                         "valor": 0.0,
+                        "ocorrencias": 0,
                         "status": f"erro: {str(e)}"
                     }
                     self.historico.append(registro)
@@ -332,8 +357,10 @@ class ExtratorFinanceiro:
             # Finaliza processamento
             self.arquivos_pendentes = []
             self.salvar_historico()
-            self.status_var.set("Processamento concluído com sucesso!")
-            messagebox.showinfo("Concluído", "Todos os arquivos foram processados!")
+                        
+            self.status_var.set(f"Processamento concluído!")
+            messagebox.showinfo("Concluído", 
+                              f"Todos os arquivos foram processados!")
             
         except Exception as e:
             self.status_var.set(f"Erro durante o processamento: {str(e)}")
@@ -350,6 +377,7 @@ class ExtratorFinanceiro:
         try:
             doc = pypdf.PdfReader(caminho_pdf)
             total = 0.0
+            contagem = 0
             
             for pagina in doc.pages:
                 texto = pagina.extract_text()
@@ -364,8 +392,9 @@ class ExtratorFinanceiro:
                         if match:
                             valor_str = match.group(1).replace(".", "").replace(",", ".")
                             total += float(valor_str)
+                            contagem += 1
             
-            return {"total": total, "status": "sucesso"}
+            return {"total": total, "contagem": contagem, "status": "sucesso"}
             
         except Exception as e:
             raise Exception(f"Erro ao processar {os.path.basename(caminho_pdf)}: {str(e)}")
@@ -390,7 +419,8 @@ class ExtratorFinanceiro:
             self.tabela_resultados.insert("", tk.END, values=(
                 item["data"],
                 item["arquivo"],
-                f"{item['valor']:.2f}" if isinstance(item['valor'], (int, float)) else item['valor']
+                f"{item['valor']:.2f}" if isinstance(item['valor'], (int, float)) else item['valor'],
+                item["ocorrencias"] if "ocorrencias" in item else "N/A"
             ), tags=(tag,))
     
     def atualizar_controles(self):
@@ -406,7 +436,12 @@ class ExtratorFinanceiro:
         try:
             if os.path.exists("historico.json"):
                 with open("historico.json", "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    historico = json.load(f)
+                    # Ensure older entries have the ocorrencias field
+                    for item in historico:
+                        if "ocorrencias" not in item:
+                            item["ocorrencias"] = 0
+                    return historico
         except Exception as e:
             messagebox.showwarning("Aviso", f"Erro ao carregar histórico:\n{str(e)}")
         return []
