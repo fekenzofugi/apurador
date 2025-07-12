@@ -58,7 +58,7 @@ class ExtratorFinanceiro:
     def carregar_configuracoes(self):
         """Carrega configurações persistentes"""
         self.config = {
-            "descricao": tk.StringVar(value="Débito por dívida Imposto interestadual"),
+            "descricao": tk.StringVar(value="(DIFAL)"),
             "ultimo_diretorio": os.path.expanduser("~")
         }
     
